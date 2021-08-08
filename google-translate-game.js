@@ -1,27 +1,39 @@
 (function () {
-  // Approximate delay between each call to update().
-  const UPDATE_DELAY_MS = 100;
+  // Selector for the language buttons in the language selection dropdown menus.
+  const DROPDOWN_BUTTON_SELECTOR = "div[data-language-code][tabindex='0']";
 
-  // Selector for the dropdown menu which chooses the target language.
-  // This element contains the menu options for each language.
-  const TARGET_LANGUAGE_PICKER_SELECTOR = "c-wiz.bvzp8c.DlHcnf div.ykTHSe div.rT1Yue:not(.O7tFcd)";
+  // Selector for the tabs that show the initial and translated language names.
+  const TAB_SELECTOR = "[role=tab]";
 
   // Selector for the top bar with the "Text" and "Documents" buttons.
-  const BUTTON_BAR_SELECTOR = "nav.U0xwnf";
+  const BUTTON_BAR_SELECTOR = "nav[aria-labelledby]:not([jsname])";
 
   // Styles to apply to hide the language names.
-  const HIDE_LANGUAGE_STYLES = ".ordo2 * { visibility: hidden; } .X4DQ0.zWsGpc { visibility: hidden; }";
+  const HIDE_LANGUAGE_STYLES = `
+    ${TAB_SELECTOR} * {
+      visibility: hidden;
+    }
 
-  /**
-   * Output a log message.
-   */
+    ${DROPDOWN_BUTTON_SELECTOR} * {
+      visibility: hidden;
+    }
+
+    ${DROPDOWN_BUTTON_SELECTOR} {
+      border: 1px solid black;
+    }
+  `;
+
+  // Millisecond interval for polling the visibility of the language menu.
+  const POLL_INTERVAL = 100;
+
+  function isLanguageMenuVisible() {
+    return document.querySelector("body > c-wiz").classList.length > 5;
+  }
+
   function log(message) {
     console.log("Google Translate Game: " + message);
   }
 
-  /**
-   * Shuffle the children of an element.
-   */
   function shuffleChildren(element) {
     const children = Array.from(element.children);
 
@@ -36,6 +48,17 @@
     element.replaceChildren(...children);
   }
 
+  function shuffleMenus() {
+    log("shuffling menus");
+    const menus = new Set();
+    for (const button of document.querySelectorAll(DROPDOWN_BUTTON_SELECTOR)) {
+      menus.add(button.parentElement);
+    }
+    for (const menu of menus) {
+      shuffleChildren(menu);
+    }
+  }
+
   // Element containing the toggleable style sheet for hiding language names.
   const hideLanguagesStyleSheet = (function() {
     const styleSheet = document.createElement("style");
@@ -44,21 +67,18 @@
     return styleSheet;
   })();
 
-  /**
-   * Set whether the language names should be hidden.
-   */
-  function setHidden(hidden) {
+  function setLanguagesHidden(hidden) {
     hideLanguagesStyleSheet.disabled = !hidden;
     log(`languages hidden: ${hidden}`);
   }
-  setHidden(false);
+  setLanguagesHidden(false);
 
   // Checkbox for hiding language names and randomizing the menu.
   const checkbox = (function () {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.addEventListener("change", () => {
-      setHidden(checkbox.checked);
+      setLanguagesHidden(checkbox.checked);
     });
     return checkbox;
   })();
@@ -77,21 +97,20 @@
   const buttonBar = document.querySelector(BUTTON_BAR_SELECTOR);
   buttonBar.appendChild(checkboxParent);
 
-  // Whether the menu was visible on the last update() call.
+  // If the checkbox is checked, shuffle the menu each time the menu is opened.
   let menuVisiblePrev = false;
-
   function update() {
-    if (checkbox.checked) {
-      const menu = document.querySelector(TARGET_LANGUAGE_PICKER_SELECTOR);
-      if (menu !== null && !menuVisiblePrev) {
-        shuffleChildren(menu);
-        log("language menu randomized");
-      }
-      menuVisiblePrev = (menu !== null);
+    const menuVisible = isLanguageMenuVisible();
+    if (menuVisible === menuVisiblePrev) {
+      return;
     }
 
-    setTimeout(update, UPDATE_DELAY_MS);
-  }
+    log("menu visible: " + menuVisible);
 
-  update();
+    menuVisiblePrev = menuVisible;
+    if (menuVisible && checkbox.checked) {
+      shuffleMenus();
+    }
+  }
+  setInterval(update, POLL_INTERVAL);
 })();
